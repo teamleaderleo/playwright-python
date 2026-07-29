@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from playwright._impl._connection import Connection
 from playwright._impl._object_factory import create_remote_object
@@ -25,6 +25,7 @@ class PlaywrightContextManager:
     def __init__(self) -> None:
         self._connection: Connection
         self._exit_was_called = False
+        self._stop_task: Optional[asyncio.Task[None]] = None
 
     async def __aenter__(self) -> AsyncPlaywright:
         loop = asyncio.get_running_loop()
@@ -51,7 +52,8 @@ class PlaywrightContextManager:
         return await self.__aenter__()
 
     async def __aexit__(self, *args: Any) -> None:
-        if self._exit_was_called:
-            return
-        self._exit_was_called = True
-        await self._connection.stop_async()
+        if not self._exit_was_called:
+            self._exit_was_called = True
+            self._stop_task = asyncio.create_task(self._connection.stop_async())
+        assert self._stop_task
+        await asyncio.shield(self._stop_task)
