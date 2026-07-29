@@ -21,10 +21,14 @@ from playwright._impl._transport import PipeTransport
 from playwright.async_api._generated import Playwright as AsyncPlaywright
 
 
+def _retain_task_exception(task: asyncio.Task[None]) -> None:
+    if not task.cancelled():
+        task.exception()
+
+
 class PlaywrightContextManager:
     def __init__(self) -> None:
         self._connection: Connection
-        self._exit_was_called = False
         self._stop_task: Optional[asyncio.Task[None]] = None
 
     async def __aenter__(self) -> AsyncPlaywright:
@@ -52,8 +56,7 @@ class PlaywrightContextManager:
         return await self.__aenter__()
 
     async def __aexit__(self, *args: Any) -> None:
-        if not self._exit_was_called:
-            self._exit_was_called = True
+        if self._stop_task is None:
             self._stop_task = asyncio.create_task(self._connection.stop_async())
-        assert self._stop_task
+            self._stop_task.add_done_callback(_retain_task_exception)
         await asyncio.shield(self._stop_task)
