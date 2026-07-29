@@ -54,7 +54,7 @@ async def test_concurrent_stop_callers_share_one_operation() -> None:
     playwright = await manager.start()
 
     connection = manager._connection
-    original_stop: Callable[[], Awaitable[None]] = connection.stop_async
+    original_stop = connection.stop_async
     entered = asyncio.Event()
     release = asyncio.Event()
     calls = 0
@@ -81,6 +81,42 @@ async def test_concurrent_stop_callers_share_one_operation() -> None:
     assert connection._closed_error is not None
 
 
+async def test_cancelling_one_waiter_does_not_cancel_shared_stop() -> None:
+    manager = async_playwright()
+    playwright = await manager.start()
+
+    connection = manager._connection
+    original_stop = connection.stop_async
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def controlled_stop() -> None:
+        nonlocal calls
+        calls += 1
+        entered.set()
+        await release.wait()
+        await original_stop()
+
+    connection.stop_async = controlled_stop  # type: ignore[method-assign]
+
+    cancelled_waiter = asyncio.create_task(playwright.stop())
+    await entered.wait()
+    surviving_waiter = asyncio.create_task(playwright.stop())
+    await asyncio.sleep(0)
+
+    cancelled_waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await cancelled_waiter
+
+    assert not surviving_waiter.done()
+    assert calls == 1
+
+    release.set()
+    await surviving_waiter
+    assert connection._closed_error is not None
+
+
 async def test_repeated_successful_stop_reuses_completion() -> None:
     manager = async_playwright()
     playwright = await manager.start()
@@ -99,7 +135,7 @@ async def test_stop_failure_is_shared_with_later_callers() -> None:
     playwright = await manager.start()
 
     connection = manager._connection
-    original_stop: Callable[[], Awaitable[None]] = connection.stop_async
+    original_stop = connection.stop_async
     failure = RuntimeError("stop failed")
     calls = 0
 
@@ -119,6 +155,43 @@ async def test_stop_failure_is_shared_with_later_callers() -> None:
         assert calls == 1
         assert outcomes == [failure, failure]
 
+        with pytest.raises(RuntimeError) as error:
+            await playwright.stop()
+        assert error.value is failure
+        assert calls == 1
+    finally:
+        connection.stop_async = original_stop  # type: ignore[method-assign]
+        await original_stop()
+
+
+async def test_stop_failure_after_cancelled_waiter_is_shared() -> None:
+    manager = async_playwright()
+    playwright = await manager.start()
+
+    connection = manager._connection
+    original_stop = connection.stop_async
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    failure = RuntimeError("stop failed after cancellation")
+    calls = 0
+
+    async def failing_stop() -> None:
+        nonlocal calls
+        calls += 1
+        entered.set()
+        await release.wait()
+        raise failure
+
+    connection.stop_async = failing_stop  # type: ignore[method-assign]
+
+    try:
+        cancelled_waiter = asyncio.create_task(playwright.stop())
+        await entered.wait()
+        cancelled_waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await cancelled_waiter
+
+        release.set()
         with pytest.raises(RuntimeError) as error:
             await playwright.stop()
         assert error.value is failure
