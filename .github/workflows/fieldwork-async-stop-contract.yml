@@ -1,0 +1,50 @@
+name: Fieldwork async stop lifecycle contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/fieldwork-async-stop-contract.yml"
+      - "playwright/async_api/_context_manager.py"
+      - "tests/async/test_async_stop_cancellation.py"
+      - "tests/async/test_async_stop_exit_contract.py"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  focused-async-stop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install repository test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r local-requirements.txt
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Check focused formatting
+        run: black --check playwright/async_api/_context_manager.py tests/async/test_async_stop_cancellation.py tests/async/test_async_stop_exit_contract.py
+
+      - name: Run focused async stop lifecycle controls
+        run: >-
+          pytest
+          tests/async/test_async_stop_cancellation.py
+          tests/async/test_async_stop_exit_contract.py
+          --timeout 30
+
+      - name: Check tracked diff hygiene
+        run: |
+          git diff --check
+          test -z "$(git status --short --untracked-files=no)"
