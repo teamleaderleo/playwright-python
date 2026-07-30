@@ -103,9 +103,9 @@ async def test_cleanup_failure_takes_precedence_and_chains_body_error() -> None:
         assert error.value is cleanup_error
         assert error.value.__context__ is body_error
     finally:
-        await manager._connection._transport.request_stop()
+        manager._connection._transport.request_stop()
         await manager._connection._transport.wait_until_stopped()
-        await manager._connection.cleanup()
+        manager._connection.cleanup()
 
 
 async def test_outer_cancellation_before_shared_stop_first_timeslice() -> None:
