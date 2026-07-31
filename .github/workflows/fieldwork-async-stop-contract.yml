@@ -27,12 +27,13 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install repository test dependencies
+      - name: Install repository test dependencies and assemble driver
         run: |
           python -m pip install --upgrade pip
           pip install -r local-requirements.txt
           pip install -r requirements.txt
           pip install -e .
+          python -m build --wheel
 
       - name: Check focused formatting
         run: black --check playwright/async_api/_context_manager.py tests/async/test_async_stop_cancellation.py tests/async/test_async_stop_exit_contract.py
@@ -42,7 +43,10 @@ jobs:
           pytest
           tests/async/test_async_stop_cancellation.py
           tests/async/test_async_stop_exit_contract.py
-          --timeout 30
+          --timeout 20
+          --reruns 0
+          -vv
+          --tb=long
 
       - name: Check tracked diff hygiene
         run: |
