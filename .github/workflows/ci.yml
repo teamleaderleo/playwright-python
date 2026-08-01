@@ -12,7 +12,7 @@ concurrency:
 jobs:
   unit-08:
     name: Unit 08 exact-head gate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v7
