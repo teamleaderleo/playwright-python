@@ -1,0 +1,84 @@
+name: Unit 08 exact-head validation
+
+on:
+  push:
+    branches:
+      - upstream/08-playwright-python-shared-shutdown-ci-33cbc587
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  lint:
+    name: Repository lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install repository dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r local-requirements.txt
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run repository pre-commit gate
+        run: pre-commit run --show-diff-on-failure --color=always --all-files
+
+      - name: Check tracked diff hygiene
+        run: |
+          git diff --check
+          test -z "$(git status --short --untracked-files=no)"
+
+  focused:
+    name: Focused lifecycle / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.14"]
+    steps:
+      - name: Check out exact carrier
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install repository test dependencies and assemble driver
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r local-requirements.txt
+          pip install -r requirements.txt
+          pip install -e .
+          python -m build --wheel
+
+      - name: Run focused async stop lifecycle controls
+        run: >-
+          pytest
+          tests/async/test_async_stop_cancellation.py
+          tests/async/test_async_stop_exit_contract.py
+          --timeout 20
+          --reruns 0
+          -vv
+          --tb=long
+
+      - name: Check tracked diff hygiene
+        run: |
+          git diff --check
+          test -z "$(git status --short --untracked-files=no)"
