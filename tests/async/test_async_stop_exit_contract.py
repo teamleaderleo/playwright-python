@@ -147,7 +147,7 @@ async def test_unjoined_stop_failure_reaches_loop_exception_handler() -> None:
     playwright = await manager.start()
 
     connection = manager._connection
-    original_stop: Callable[[], Awaitable[None]] = connection.stop_async
+    original_stop = connection.stop_async
     entered = asyncio.Event()
     release = asyncio.Event()
     completed = asyncio.Event()
@@ -190,5 +190,5 @@ async def test_unjoined_stop_failure_reaches_loop_exception_handler() -> None:
         assert len(contexts) == 1
     finally:
         loop.set_exception_handler(previous_handler)
-        connection.stop_async = original_stop
+        connection.stop_async = original_stop  # type: ignore[method-assign]
         await original_stop()
