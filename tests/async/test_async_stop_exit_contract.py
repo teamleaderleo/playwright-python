@@ -189,5 +189,5 @@ async def test_unjoined_stop_failure_reaches_loop_exception_handler() -> None:
         assert len(contexts) == 1
     finally:
         loop.set_exception_handler(previous_handler)
-        connection.stop_async = original_stop  # type: ignore[method-assign]
+        connection.stop_async = original_stop
         await original_stop()
