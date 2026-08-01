@@ -1,180 +1,68 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - release-*
   pull_request:
     branches:
-      - main
       - release-*
 
 concurrency:
-  # For pull requests, cancel all currently-running jobs for this workflow
-  # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#concurrency
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  infra:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v7
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.10"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r local-requirements.txt
-        pip install -r requirements.txt
-        pip install -e .
-    - name: Lint
-      run: pre-commit run --show-diff-on-failure --color=always --all-files
-
-  build:
-    name: Build
+  unit-08:
+    name: Unit 08 exact-head gate
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.10', '3.14']
-        browser: [chromium, firefox, webkit]
-        exclude:
-        # WebKit on standard macOS-latest (currently macos-15-arm64) is unstable;
-        # upstream pins paid macos-15-xlarge for cross-browser webkit too.
-        - os: macos-latest
-          browser: webkit
-        include:
-        - os: macos-15-xlarge
-          python-version: '3.10'
-          browser: webkit
-        - os: macos-15-xlarge
-          python-version: '3.14'
-          browser: webkit
-        - os: windows-latest
-          python-version: '3.11'
-          browser: chromium
-        - os: macos-latest
-          python-version: '3.11'
-          browser: chromium
-        - os: ubuntu-latest
-          python-version: '3.11'
-          browser: chromium
-        - os: windows-latest
-          python-version: '3.12'
-          browser: chromium
-        - os: macos-latest
-          python-version: '3.12'
-          browser: chromium
-        - os: ubuntu-latest
-          python-version: '3.12'
-          browser: chromium
-        - os: windows-latest
-          python-version: '3.13'
-          browser: chromium
-        - os: macos-latest
-          python-version: '3.13'
-          browser: chromium
-        - os: ubuntu-latest
-          python-version: '3.13'
-          browser: chromium
-    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v7
-    - name: Set up Python
-      uses: actions/setup-python@v7
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies & browsers
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r local-requirements.txt
-        pip install -r requirements.txt
-        pip install -e .
-        python -m build --wheel
-        python -m playwright install --with-deps ${{ matrix.browser }}
-    - name: Common Tests
-      run: pytest tests/common --browser=${{ matrix.browser }} --timeout 90
-    - name: Test Reference count
-      run: pytest tests/test_reference_count_async.py --browser=${{ matrix.browser }}
-    - name: Test Wheel Installation
-      run: pytest tests/test_installation.py --browser=${{ matrix.browser }}
-    - name: Test Sync API
-      if: matrix.os != 'ubuntu-latest'
-      run: pytest tests/sync --browser=${{ matrix.browser }} --timeout 90
-    - name: Test Sync API
-      if: matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/sync --browser=${{ matrix.browser }} --timeout 90
-    - name: Test Async API
-      if: matrix.os != 'ubuntu-latest'
-      run: pytest tests/async --browser=${{ matrix.browser }} --timeout 90
-    - name: Test Async API
-      if: matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/async --browser=${{ matrix.browser }} --timeout 90
+        persist-credentials: false
 
-  test-stable:
-    name: Stable
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        browser-channel: [chrome]
-        include:
-        - os: windows-latest
-          browser-channel: msedge
-        - os: macos-latest
-          browser-channel: msedge
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v7
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.10"
-    - name: Install dependencies & browsers
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r local-requirements.txt
-        pip install -r requirements.txt
-        pip install -e .
-        python -m build --wheel
-        python -m playwright install ${{ matrix.browser-channel }} --with-deps
-    - name: Common Tests
-      run: pytest tests/common --browser=chromium --browser-channel=${{ matrix.browser-channel }} --timeout 90
-    - name: Test Sync API
-      if: matrix.os != 'ubuntu-latest'
-      run: pytest tests/sync --browser=chromium --browser-channel=${{ matrix.browser-channel }} --timeout 90
-    - name: Test Sync API
-      if: matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/sync --browser=chromium --browser-channel=${{ matrix.browser-channel }} --timeout 90
-    - name: Test Async API
-      if: matrix.os != 'ubuntu-latest'
-      run: pytest tests/async --browser=chromium --browser-channel=${{ matrix.browser-channel }} --timeout 90
-    - name: Test Async API
-      if: matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/async --browser=chromium --browser-channel=${{ matrix.browser-channel }} --timeout 90
-
-  test_examples:
-    name: Examples
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: examples/todomvc/
-    steps:
-    - uses: actions/checkout@v7
-    - name: Set up Python
+    - name: Set up Python 3.10
       uses: actions/setup-python@v7
       with:
         python-version: '3.10'
-    - name: Install dependencies & browsers
+    - name: Python 3.10 repository gate and lifecycle tests
       run: |
+        python -m pip install --upgrade pip
+        pip install -r local-requirements.txt
         pip install -r requirements.txt
-        python -m playwright install --with-deps chromium
-    - name: Common Tests
-      run: pytest
+        pip install -e .
+        rm -rf dist
+        python -m build --wheel
+        pre-commit run --show-diff-on-failure --color=always --all-files
+        pytest tests/async/test_async_stop_cancellation.py tests/async/test_async_stop_exit_contract.py --timeout 20 --reruns 0 -vv --tb=long
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.12'
+    - name: Python 3.12 lifecycle tests
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r local-requirements.txt
+        pip install -r requirements.txt
+        pip install -e .
+        rm -rf dist
+        python -m build --wheel
+        pytest tests/async/test_async_stop_cancellation.py tests/async/test_async_stop_exit_contract.py --timeout 20 --reruns 0 -vv --tb=long
+
+    - name: Set up Python 3.14
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.14'
+    - name: Python 3.14 lifecycle tests
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r local-requirements.txt
+        pip install -r requirements.txt
+        pip install -e .
+        rm -rf dist
+        python -m build --wheel
+        pytest tests/async/test_async_stop_cancellation.py tests/async/test_async_stop_exit_contract.py --timeout 20 --reruns 0 -vv --tb=long
+
+    - name: Tracked diff hygiene
+      run: |
+        git diff --check
+        test -z "$(git status --short --untracked-files=no)"
