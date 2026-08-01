@@ -1,9 +1,12 @@
 name: Unit 08 exact-head validation
 
 on:
-  push:
-    branches:
-      - upstream/08-playwright-python-shared-shutdown-ci-33cbc587
+  pull_request:
+    paths:
+      - ".github/workflows/unit-08-exact-head.yml"
+      - "playwright/async_api/_context_manager.py"
+      - "tests/async/test_async_stop_cancellation.py"
+      - "tests/async/test_async_stop_exit_contract.py"
   workflow_dispatch:
 
 permissions: {}
