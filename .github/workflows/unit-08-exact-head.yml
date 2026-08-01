@@ -11,6 +11,8 @@ on:
 
 permissions: {}
 
+# Carrier trigger: 1
+
 jobs:
   lint:
     name: Repository lint
