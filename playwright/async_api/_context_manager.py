@@ -107,11 +107,13 @@ class PlaywrightContextManager:
         if self._stop_task is None:
             self._stop_task = asyncio.create_task(self._connection.stop_async())
             self._stop_task.add_done_callback(self._stop_done)
+        stop_task = self._stop_task
 
         self._cancel_unobserved_stop_failure_report()
         self._stop_waiters += 1
         try:
-            await asyncio.shield(self._stop_task)
+            await asyncio.wait({stop_task})
+            await stop_task
         except asyncio.CancelledError:
             raise
         except BaseException:
