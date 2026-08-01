@@ -182,6 +182,7 @@ async def test_unjoined_stop_failure_reaches_loop_exception_handler() -> None:
         assert len(contexts) == 1
         assert contexts[0]["exception"] is failure
         assert contexts[0]["message"] == "Playwright stop task failed"
+        assert contexts[0]["task"] is manager._stop_task
 
         with pytest.raises(RuntimeError) as error:
             await playwright.stop()
